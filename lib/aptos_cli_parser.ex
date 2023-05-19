@@ -1,4 +1,7 @@
-defmodule MoveE2ETestTool.SuiCliParser do
+defmodule MoveE2ETestTool.AptosCliParser do
+  # +--------------+
+  # | Parse Script |
+  # +--------------+
   def parse_cmd(str), do: :erlang.hd(parse_script_to_clis(str))
 
   def parse_script_to_clis(str) do
@@ -11,6 +14,9 @@ defmodule MoveE2ETestTool.SuiCliParser do
     code
   end
 
+  @doc """
+    parse script to get formatted lines of script
+  """
   def parse_script(str, module \\ "Tmp") do
     {:ok, token, _} = :sui_leex.string(String.to_charlist(str))
     {:ok, {res, code}} = :sui_yecc.parse(token)
@@ -47,5 +53,54 @@ defmodule MoveE2ETestTool.SuiCliParser do
     end
     end
     "
+  end
+
+  # +------------+
+  # | Parse Code |
+  # +------------+
+
+  import NimbleParsec
+  
+  @moduledoc """
+    aptos CLI commands:
+      $ aptos move init
+  """
+
+  aptos_signal =
+    string("aptos")
+
+  aptos_move_signal =
+    string("aptos move")
+  space = ascii_string([?\s], min: 0) |> ignore()
+  name_param_signal =
+    string("--name")
+    |> ignore(space)
+    |> concat(ascii_string([?_, ?0..?9, ?a..?z, ?A..?Z], min: 0))
+
+  defparsec :cmd,
+    choice([
+      aptos_move_signal,
+      aptos_signal
+    ])
+    |> ignore(space)
+    |> optional() # behaviours
+    |> optional(name_param_signal), debug: true # params
+  def parse_cmd(cmd_str) do
+    with {:ok, result, _, _, _, _} <- cmd(cmd_str) do
+      {[first_arg], others} = Enum.split(result, 1)
+      do_parse_cmd(first_arg, others)
     end
+  end
+
+  def do_parse_cmd("aptos", params), do: handle_aptos(params)
+  def do_parse_cmd("aptos move", params), do: handle_aptos_move(params)
+
+  def handle_aptos(params) do
+    :aptos
+  end
+
+  def handle_aptos_move(params) do
+    :aptos_move
+  end
+  
 end

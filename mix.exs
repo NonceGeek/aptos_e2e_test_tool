@@ -26,7 +26,7 @@ defmodule MoveE2ETestTool.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:web3_move_ex, "~> 0.6.0"},
+      {:web3_move_ex, "~> 1.1.1"},
       {:binary, "~> 0.0.5"},
       {:nimble_parsec, "~> 1.2"},
       {:ex_unit_release, "~> 0.1"},

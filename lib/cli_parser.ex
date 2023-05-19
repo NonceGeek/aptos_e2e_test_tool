@@ -1,31 +1,86 @@
 defmodule MoveE2ETestTool.CliParser do
+  alias Web3AptosEx.Aptos
   alias Web3MoveEx.Sui
-  alias MoveE2ETestTool.SuiCliParser
+  alias MoveE2ETestTool.AptosCliParser
+  alias MoveE2ETestTool.CmdSpliter
   @moduledoc """
   """
-  def main(["--file", file]) do
-    {:ok, script} = File.read(file)
-    {:ok, _} = Application.ensure_all_started(:web3_move_ex)
-    run(script, file)
-  end
-  def run(script, file \\ "tmp.script") do
-    m = file_to_module(file)
-    code = SuiCliParser.parse_script_to_code(script, m)
-    :ok = :file.write_file(:filename.rootname(file) <> ".ex", code)
-    Code.eval_string(code)
-    {:ok, agent} = start()
-    apply(String.to_atom("Elixir.MoveE2ETestTool." <> m), :run, [agent])
+  # def main(["--file", file]) do
+  #   {:ok, script} = File.read(file)
+  #   {:ok, _} = Application.ensure_all_started(:web3_move_ex)
+  #   run(script, file)
+  # end
+  # def run(script, file \\ "tmp.script") do
+  #   m = file_to_module(file)
+  #   code = SuiCliParser.parse_script_to_code(script, m)
+  #   :ok = :file.write_file(:filename.rootname(file) <> ".ex", code)
+  #   Code.eval_string(code)
+  #   {:ok, agent} = start()
+  #   apply(String.to_atom("Elixir.MoveE2ETestTool." <> m), :run, [agent])
+  # end
+
+  def start(network_type) do
+    {:ok, client} = Aptos.connect(network_type)
+    {:ok, pid} = Agent.start_link(fn -> %{client: client} end)
+    Process.register(pid, :aptos_client)
   end
 
-  def start() do
-    {:ok, client} = Sui.RPC.connect()
-    Agent.start_link(fn -> %{client: client} end)
+  def exec_cmd(%{cli: :code, line: code_line}) do
+    code_line
+    |> CmdSpliter.parse_cmd()
+    |> do_exec_cmd()
   end
 
-  def start(client) do
-    Agent.start_link(fn -> %{client: client} end)
+  # --- aptos move commands ---
+  def do_exec_cmd({"aptos move", sub_cmd, payload}) do
+    
+  end
+  # --- end ---
+
+  # --- aptos commands ---
+  def do_exec_cmd({"aptos", "init", %{priv: priv, profile: profile_name}}) do 
+    {:ok, acct} = Web3AptosEx.Aptos.generate_keys(priv)
+    pid = Process.whereis(:aptos_client)
+    Agent.update(pid, fn payload -> Map.put(payload, String.to_atom(profile_name), %{acct: acct}) end)
   end
 
+  def do_exec_cmd({"aptos", "init", %{profile: profile_name}}) do 
+    {:ok, acct} = Web3AptosEx.Aptos.generate_keys()
+    pid = Process.whereis(:aptos_client)
+    Agent.update(pid, fn payload -> Map.put(payload, String.to_atom(profile_name), %{acct: acct}) end)
+  end
+  
+  def do_exec_cmd({"aptos", "account", "transfer", _sth}) do 
+    :transfer
+  end
+
+  @doc """
+    result format:
+
+    ```
+      {:ok, ["72f3229a4e9ad41f7ceb5f59dadfaac76200708511657452cd488b1739ab651d"]}
+    ```
+  """
+  def do_exec_cmd({"aptos", "account", "fund-with-faucet", %{profile_name: profile_name}}) do 
+    payload = get_info()
+    %{acct: acct} = Map.get(payload, String.to_atom(profile_name))
+    %{client: client} = payload
+    Web3AptosEx.Aptos.get_faucet(client, acct.address_hex)
+  end
+
+  def do_exec_cmd({"aptos", "account", "transfer",  %{profile_name: profile_name, account: account, amount: amount}) do 
+    payload = get_info()
+    %{acct: acct} = Map.get(payload, String.to_atom(profile_name))
+    %{client: client} = payload
+    Web3AptosEx.Aptos.get_faucet(client, acct.address_hex)
+  end
+  # --- end ---
+
+  def get_info() do
+    pid = Process.whereis(:aptos_client)
+    Agent.get(pid, (&(&1)))
+  end
+  
   def cmd(agent, %{"cli" => "sui_client", "cmd" => "new-address", "args" => [key_schema | _]}) do
     {:ok, acct} = Web3MoveEx.Sui.gen_acct(String.to_atom(key_schema))
 #    {:ok, acct} =

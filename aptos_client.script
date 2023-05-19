@@ -1,0 +1,2 @@
+# 初始化账户
+aptos init --profile testnet --network testnet
