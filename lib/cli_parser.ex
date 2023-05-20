@@ -1,23 +1,9 @@
-defmodule MoveE2ETestTool.CliParser do
+defmodule AptosE2ETestTool.CliParser do
   alias Web3AptosEx.Aptos
-  alias Web3MoveEx.Sui
-  alias MoveE2ETestTool.AptosCliParser
-  alias MoveE2ETestTool.CmdSpliter
-  @moduledoc """
-  """
-  # def main(["--file", file]) do
-  #   {:ok, script} = File.read(file)
-  #   {:ok, _} = Application.ensure_all_started(:web3_move_ex)
-  #   run(script, file)
-  # end
-  # def run(script, file \\ "tmp.script") do
-  #   m = file_to_module(file)
-  #   code = SuiCliParser.parse_script_to_code(script, m)
-  #   :ok = :file.write_file(:filename.rootname(file) <> ".ex", code)
-  #   Code.eval_string(code)
-  #   {:ok, agent} = start()
-  #   apply(String.to_atom("Elixir.MoveE2ETestTool." <> m), :run, [agent])
-  # end
+  alias AptosE2ETestTool.CmdSpliter
+
+  import Web3AptosEx.Aptos
+  require Logger
 
   def start(network_type) do
     {:ok, client} = Aptos.connect(network_type)
@@ -25,33 +11,140 @@ defmodule MoveE2ETestTool.CliParser do
     Process.register(pid, :aptos_client)
   end
 
+  def exec_cmd(%{cli: :comment, line: "# ex-script: set-network testnet"}) do
+    start(:testnet)
+  end
+
+  def exec_cmd(%{cli: :comment, line: "# ex-script: set-network mainnet"}) do
+    start(:mainnet)
+  end
+
+  def exec_cmd(%{cli: :comment, line: "# ex-script: sleep 2s"}) do
+    Process.sleep(2000)
+  end
+
+  def exec_cmd(%{cli: :comment, line: line}) do
+    {prefix, ex_script} = String.split_at(line, 12)
+    case prefix do
+      "# ex-script:" ->
+        exec_ex_cmd(ex_script)
+      _others ->
+        :pass
+    end
+  end
+
+  @doc """
+    only parse after cmd in mvp version:
+    ```
+      assert "message" in "0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::MessageHolder" == "Hello_World"
+    ```
+  """
+  def exec_ex_cmd(ex_script) do
+    ["assert", key, "of", profile_name, "in", resource_path, "==", var] = String.split(ex_script)
+    info = get_info()
+    %{acct: acct} = Map.get(info, String.to_atom(profile_name))
+    %{client: client} = info
+    resource_path = String.replace(resource_path, "\"", "")
+    var = String.replace(var, "\"", "")
+    key = String.replace(key, "\"", "")
+    {:ok, payload} = Aptos.get_resource(client, acct.address_hex, resource_path)
+    payload
+    |> Map.get(:data)
+    |> Map.get(String.to_atom(key))
+    |> Kernel.==(var)
+
+  end
+
   def exec_cmd(%{cli: :code, line: code_line}) do
     code_line
     |> CmdSpliter.parse_cmd()
-    |> do_exec_cmd()
+    |> case do
+      :pass ->
+        :pass
+      others ->
+
+        do_exec_cmd(others)
+    end
   end
 
   # --- aptos move commands ---
-  def do_exec_cmd({"aptos move", sub_cmd, payload}) do
-    
+  def do_exec_cmd({"aptos move", "run", payload}) do
+    func_id = Map.fetch!(payload, "function-id")
+    args_raw = Map.fetch!(payload, "args")
+    profile_name = Map.fetch!(payload, "profile")
+    # TODO: implementation of type-args
+    # ~a"0x1::coin::transfer<CoinType>(address, u64)"
+    {arg_types, arg_values} = handle_args(args_raw) 
+    {:ok, f} = ~a"#{func_id}(#{arg_types})"
+    payload = Aptos.call_function(f, [], arg_values)
+
+    info = get_info()
+    %{acct: acct} = Map.get(info, String.to_atom(profile_name))
+    %{client: client} = info
+
+    Aptos.submit_txn(client, acct, payload)
   end
+  
   # --- end ---
+
+  def handle_args(args_raw) when is_binary(args_raw) do
+    [type, value] = String.split(args_raw, ":", parts: 2)
+    {type, [value]}
+  end
+  def handle_args(args_raw) when is_list(args_raw) do
+    types =
+      args_raw
+      |> Enum.map(fn arg ->
+        [type, _value] = String.split(arg, ":", parts: 2)
+        type
+      end)
+      |> Enum.reduce("", fn type, acc ->
+        "#{acc}, #{type}"
+      end)
+      |> Binary.drop(2)
+
+    values = 
+      args_raw
+      |> Enum.map(fn arg ->
+        [_type, value] = String.split(arg, ":", parts: 2)
+        value
+      end)
+    {types, values}
+  end
 
   # --- aptos commands ---
   def do_exec_cmd({"aptos", "init", %{priv: priv, profile: profile_name}}) do 
+    info = get_info()
+    %{client: client} = info
+
     {:ok, acct} = Web3AptosEx.Aptos.generate_keys(priv)
+    acct_loaded = 
+      case Aptos.load_account(client, acct) do
+        {:ok, acct_loaded} ->
+          acct_loaded
+        _others ->
+          acct
+      end
     pid = Process.whereis(:aptos_client)
-    Agent.update(pid, fn payload -> Map.put(payload, String.to_atom(profile_name), %{acct: acct}) end)
+    Agent.update(pid, fn payload -> Map.put(payload, String.to_atom(profile_name), %{acct: acct_loaded}) end)
+    %{addr: acct.address_hex, priv: acct.priv_key_hex}
   end
 
   def do_exec_cmd({"aptos", "init", %{profile: profile_name}}) do 
+    info = get_info()
+    %{client: client} = info
+
     {:ok, acct} = Web3AptosEx.Aptos.generate_keys()
+    acct_loaded = 
+      case Aptos.load_account(client, acct) do
+        {:ok, acct_loaded} ->
+          acct_loaded
+        _others ->
+          acct
+      end
     pid = Process.whereis(:aptos_client)
-    Agent.update(pid, fn payload -> Map.put(payload, String.to_atom(profile_name), %{acct: acct}) end)
-  end
-  
-  def do_exec_cmd({"aptos", "account", "transfer", _sth}) do 
-    :transfer
+    Agent.update(pid, fn payload -> Map.put(payload, String.to_atom(profile_name), %{acct: acct_loaded}) end)
+    %{addr: acct.address_hex, priv: acct.priv_key_hex}
   end
 
   @doc """
@@ -65,14 +158,62 @@ defmodule MoveE2ETestTool.CliParser do
     payload = get_info()
     %{acct: acct} = Map.get(payload, String.to_atom(profile_name))
     %{client: client} = payload
-    Web3AptosEx.Aptos.get_faucet(client, acct.address_hex)
+    res = Aptos.get_faucet(client, acct.address_hex)
+    Process.sleep(2000) # sleep 2 sec.
+    {:ok, acct_loaded} = Aptos.load_account(client, acct)
+
+    pid = Process.whereis(:aptos_client)
+    Agent.update(pid, fn payload -> Map.put(payload, String.to_atom(profile_name), %{acct: acct_loaded}) end)
+    res
   end
 
-  def do_exec_cmd({"aptos", "account", "transfer",  %{profile_name: profile_name, account: account, amount: amount}) do 
+
+  """
+    result format:
+
+    ```
+      {:ok,
+        %{
+          expiration_timestamp_secs: "1684474519",
+          gas_unit_price: "1000",
+          hash: "0x771cf8ed9164b0f4d7a6aafe8cfad4fb55f41f99c07cba682c7342b9333e608c",
+          max_gas_amount: "2000",
+          payload: %{
+            arguments: ["0x2df41622c0c1baabaa73b2c24360d205e23e803959ebbcb0e5b80462165893ed",
+              "100"],
+            function: "0x1::coin::transfer",
+            type: "entry_function_payload",
+            type_arguments: ["0x1::aptos_coin::AptosCoin"]
+          },
+          sender: "0x1fe4a4a607c125fce5aefa12a28d53a9383ad1d35fb8044ee42698db5aaab9ff",
+          sequence_number: "0",
+          signature: %{
+            public_key: "0xa3642f14f12d323c646f49419df536b3f2b06d571aee32870ebb6906eefae41a",
+            signature: "0xe3712a27ea90be18de895fa97349ba1b206ebf295091d38b769c1a30573e4e558e72f8fcf58d806d33ee1994c7aacf224792fa1eb558bec98b5ef2646dbd4503",
+            type: "ed25519_signature"
+          }
+        }}   
+    ```
+  """
+  def do_exec_cmd({"aptos", "account", "transfer",  %{profile_name: profile_name, account: to, amount: amount}}) do 
     payload = get_info()
     %{acct: acct} = Map.get(payload, String.to_atom(profile_name))
     %{client: client} = payload
-    Web3AptosEx.Aptos.get_faucet(client, acct.address_hex)
+    Aptos.transfer(client, acct, to, String.to_integer(amount))
+  end
+
+  def do_exec_cmd({"aptos", "account", "get-balance", %{profile_name: profile_name}}) do
+    payload = get_info()
+    %{acct: acct} = Map.get(payload, String.to_atom(profile_name))
+    %{client: client} = payload
+    Aptos.get_balance(client, acct.address_hex)
+  end
+
+  def do_exec_cmd({"aptos", "account", "list --query resources", %{profile_name: profile_name}}) do
+    payload = get_info()
+    %{acct: acct} = Map.get(payload, String.to_atom(profile_name))
+    %{client: client} = payload
+    Aptos.get_resources(client, acct.address_hex)
   end
   # --- end ---
 
@@ -80,108 +221,4 @@ defmodule MoveE2ETestTool.CliParser do
     pid = Process.whereis(:aptos_client)
     Agent.get(pid, (&(&1)))
   end
-  
-  def cmd(agent, %{"cli" => "sui_client", "cmd" => "new-address", "args" => [key_schema | _]}) do
-    {:ok, acct} = Web3MoveEx.Sui.gen_acct(String.to_atom(key_schema))
-#    {:ok, acct} =
-#      {:ok,
-#       %Web3MoveEx.Sui.Account{
-#         sui_address:
-#           <<173, 247, 138, 113, 25, 16, 185, 209, 222, 3, 2, 38, 31, 18, 48, 156, 136, 2, 245,
-#             243, 0, 205, 170, 16, 200, 119, 17, 120, 234, 150, 208, 145>>,
-#         sui_address_hex: "0xadf78a711910b9d1de0302261f12309c8802f5f300cdaa10c8771178ea96d091",
-#         priv_key:
-#           <<0, 11, 166, 31, 134, 41, 92, 19, 157, 130, 92, 13, 61, 169, 69, 25, 184, 250, 110,
-#             217, 83, 192, 231, 128, 112, 2, 108, 115, 39, 229, 224, 14, 7>>,
-#         priv_key_base64: "AAumH4YpXBOdglwNPalFGbj6btlTwOeAcAJscyfl4A4H",
-#         key_schema: "ed25519",
-#         phrase:
-#           "city record reject glow similar misery finger tongue wage diesel high prevent end gadget pill tiny shine muffin prefer coffee custom shell quantum office"
-#       }}
-
-    Agent.update(agent, fn dict ->
-      Map.put(dict, :acct, acct)
-    end)
-
-    {:ok, acct}
-  end
-
-  def cmd(agent, %{"cli" => "sui_client", "cmd" => "new-address"} = cmd) do
-    cmd(agent, Map.put(cmd, "args", ["ed25519"]))
-  end
-
-  def cmd(agent, %{"cli" => "sui_client", "cmd" => "gas"}) do
-    %{client: client, acct: acct} = Agent.get(agent, fn state -> state end)
-    {:ok, %{data: data}} = Web3MoveEx.Sui.get_all_coins(client, acct.sui_address_hex)
-    data
-  end
-
-  def cmd(agent, %{
-        "cli" => "sui_client",
-        "cmd" => "call",
-        "package" => [package],
-        "function" => [function],
-        "module" => [module],
-        "args" => args,
-        "gas" => [gas],
-        "gas-budget" => [gas_budget]
-      }) do
-    %{client: client, acct: acct} = Agent.get(agent, fn state -> state end)
-    client |> Sui.move_call(acct, package, module, function, [], args, gas, gas_budget)
-  end
-
-  def cmd(
-        agent,
-        %{
-          "cli" => "sui_client",
-          "cmd" => "call",
-          "package" => package,
-          "function" => function,
-          "module" => module,
-          "args" => args,
-          "gas-budget" => gas_budget
-        } = params
-      ) do
-    cmd(agent, Map.put(params, "gas", [nil]))
-  end
-
-  @doc """
-    "sui client transfer-sui --to 0x181bd292dbe70628479b85e873460caa3e180fe2 --sui-coin-object-id 0x82db13db77f034873cf3f1f2e43fc1237e08664e --gas-budget 30000"
-  """
-  def cmd(agent, %{
-        "cli" => "sui_client",
-        "cmd" => "transfer-sui",
-        "gas-budget" => [gas_budget],
-        "sui-coin-object-id" => [sui_coin_object_id],
-        "to" => [to]
-      }) do
-    %{client: client, acct: acct} = Agent.get(agent, fn state -> state end)
-    Sui.unsafe_transfer(client, acct, sui_coin_object_id, gas_budget, to)
-  end
-  def cmd(agent, %{
-  "cli" => "sui_client",
-  "cmd" => "import-address",
-  "args" => args
-  }) do
-   addresses = args |> Enum.map(fn x -> Web3MoveEx.Sui.Account.from(x)  end)
-   Agent.update(agent, fn dict ->
-      Map.put(dict, :addresses, addresses)
-      Map.put(dict, :acc, :erlang.hd(addresses))
-    end)
-  end
-  defp file_to_module(file) when is_binary(file) do
-    name = :filename.rootname(file)
-     [a|rest] = name1 = to_charlist(name)
-     String.upcase(List.to_string([a])) <> change_module(rest, "")
-    end
-
-  defp change_module([], acc) do
-    acc
-    end
-    defp change_module([?_, f| rest], acc) do
-        change_module(rest, acc <> String.upcase(List.to_string([f])))
-    end
-    defp change_module([f| rest], acc) do
-    change_module(rest, acc <> List.to_string([f]))
-    end
 end

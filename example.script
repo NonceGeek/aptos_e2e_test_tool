@@ -1,0 +1,25 @@
+# -[acct operations]-
+
+# ex-script: set-network testnet
+# init account.
+aptos init --priv 0xb46737230c6037ac1c5efcf67c1ba039947eaf354d3960851df55ed3abd2eb9c --profile leeduckgo
+# get some faucet.
+aptos account fund-with-faucet --profile leeduckgo
+aptos account get-balance --profile leeduckgo
+
+# -[contract test]-
+# contract addr: 0xcd6e69ff3c22db037584f b1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd
+# network: testnet
+# contract name: hello_blockchain
+
+# run the set message
+aptos move run --function-id 0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::set_message --profile leeduckgo --args string:Hello_World 
+aptos account list --query resources --profile leeduckgo
+# ↓ this cmd should return true ↓
+# default profile
+# ex-script: assert "message" of leeduckgo in "0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::MessageHolder" == "Hello_World"
+
+aptos move run --function-id 0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::set_message  --profile leeduckgo --args string:Hello_Aptos 
+# ↓ this cmd should return false ↓
+# default profile
+# ex-script: assert "message" of leeduckgo in "0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::MessageHolder" == "Hello_World"

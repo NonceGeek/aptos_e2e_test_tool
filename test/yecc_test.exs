@@ -1,6 +1,6 @@
 defmodule YeccTest do
   use ExUnit.Case
-  doctest MoveE2ETestTool
+  doctest AptosE2ETestTool
 
   test "sui parser" do
     sui_scripts = """
@@ -59,7 +59,7 @@ defmodule YeccTest do
   end
 
   def check_sui(str, expected) do
-    res = MoveE2ETestTool.SuiCliParser.parse_script_to_clis(str)
+    res = AptosE2ETestTool.SuiCliParser.parse_script_to_clis(str)
     assert expected == res
   end
 end

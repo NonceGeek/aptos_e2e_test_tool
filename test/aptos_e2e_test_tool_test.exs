@@ -1,13 +1,13 @@
-defmodule MoveE2ETestToolTest do
+defmodule AptosE2ETestToolTest do
   use ExUnit.Case
-  doctest MoveE2ETestTool
+  doctest AptosE2ETestTool
 
   test "runtime compile" do
     Code.eval_string("defmodule A do\ndef a do\n1\nend\nend")
     assert 1 = A.a()
   end
     test "generate code" do
-        assert 1 = MoveE2ETestTool.CliParser.run("a=1\nassert a=1\n1")
+        assert 1 = AptosE2ETestTool.CliParser.run("a=1\nassert a=1\n1")
         new_address = "
         LOG=DEBUG
         sui client new-address
@@ -19,7 +19,7 @@ defmodule MoveE2ETestToolTest do
         IO.inspect(res)
         :ok
         "
-        assert :ok == MoveE2ETestTool.CliParser.run(new_address)
+        assert :ok == AptosE2ETestTool.CliParser.run(new_address)
    end
 
   test "parse script" do
@@ -63,7 +63,7 @@ defmodule MoveE2ETestToolTest do
              %{cli: :code, line: "    a=a"},
              %{cli: :code, line: "    #"}
            ] =
-             MoveE2ETestTool.SuiCliParser.parse_script_to_clis(script())
+             AptosE2ETestTool.SuiCliParser.parse_script_to_clis(script())
   end
 
   test "sui client import_address" do
@@ -75,7 +75,7 @@ defmodule MoveE2ETestToolTest do
                "AKpjfApmHx8FbjrRRSrUlF6ITigjP8NMS1ip4JdqPp5g"
              ]
            } =
-             MoveE2ETestTool.SuiCliParser.parse_cmd(
+             AptosE2ETestTool.SuiCliParser.parse_cmd(
                "sui client import-address AKpjfApmHx8FbjrRRSrUlF6ITigjP8NMS1ip4JdqPp5g AKpjfApmHx8FbjrRRSrUlF6ITigjP8NMS1ip4JdqPp5g"
              )
   end
@@ -93,7 +93,7 @@ defmodule MoveE2ETestToolTest do
              :package => ["0x08204ed92afcfdf9d0f6727a2c7d40db93a059d8"],
              :gas => ["gas_obj"],
              :"gas-budget" => ["30000"]
-           } = MoveE2ETestTool.SuiCliParser.parse_cmd(line)
+           } = AptosE2ETestTool.SuiCliParser.parse_cmd(line)
   end
 
   test "sui client transfer-sui" do
@@ -108,7 +108,7 @@ defmodule MoveE2ETestToolTest do
                "0x3a5f70f0bedb661f1e8bc596e308317edb0bdccc5bc86207b45f01db1aad5ddf"
              ],
              to: ["0x313c133acaf25103aae40544003195e1a3bb7d5b2b11fd4c6ec61af16bcdb968"]
-           } = MoveE2ETestTool.SuiCliParser.parse_cmd(line)
+           } = AptosE2ETestTool.SuiCliParser.parse_cmd(line)
   end
 
   def script() do

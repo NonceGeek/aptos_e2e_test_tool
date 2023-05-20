@@ -1,8 +1,7 @@
-defmodule MoveE2ETestTool.AptosCliParser do
+defmodule AptosE2ETestTool.ScriptParser do
   # +--------------+
   # | Parse Script |
   # +--------------+
-  def parse_cmd(str), do: :erlang.hd(parse_script_to_clis(str))
 
   def parse_script_to_clis(str) do
     {res, code} = parse_script(str)
@@ -14,8 +13,17 @@ defmodule MoveE2ETestTool.AptosCliParser do
     code
   end
 
+  def parse_script_from_file(file_path) do
+    file_path
+    |> File.read!()
+    |> parse_script()
+  end
+
   @doc """
-    parse script to get formatted lines of script
+    parse script to get formatted lines of script.
+    ```
+      AptosE2ETestTool.ScriptParser.parse_script_from_file("example.script")
+    ```
   """
   def parse_script(str, module \\ "Tmp") do
     {:ok, token, _} = :sui_leex.string(String.to_charlist(str))
@@ -26,7 +34,7 @@ defmodule MoveE2ETestTool.AptosCliParser do
     code = :re.replace(code, "%{inspect", "\#{inspect", [:global, {:return, :binary}])
 
     code =
-      "defmodule MoveE2ETestTool." <> module <> " do\nuse ExUnit.Case\ndef run(agent) do\n:persistent_term.put(:log,:nil)\n" <>
+      "defmodule AptosE2ETestTool." <> module <> " do\nuse ExUnit.Case\ndef run(agent) do\n:persistent_term.put(:log,:nil)\n" <>
         code <>
         "\nend\ndef ignore_warn(_res), do: :ok \n" <> debug() <> "\nend"
 
@@ -53,54 +61,6 @@ defmodule MoveE2ETestTool.AptosCliParser do
     end
     end
     "
-  end
-
-  # +------------+
-  # | Parse Code |
-  # +------------+
-
-  import NimbleParsec
-  
-  @moduledoc """
-    aptos CLI commands:
-      $ aptos move init
-  """
-
-  aptos_signal =
-    string("aptos")
-
-  aptos_move_signal =
-    string("aptos move")
-  space = ascii_string([?\s], min: 0) |> ignore()
-  name_param_signal =
-    string("--name")
-    |> ignore(space)
-    |> concat(ascii_string([?_, ?0..?9, ?a..?z, ?A..?Z], min: 0))
-
-  defparsec :cmd,
-    choice([
-      aptos_move_signal,
-      aptos_signal
-    ])
-    |> ignore(space)
-    |> optional() # behaviours
-    |> optional(name_param_signal), debug: true # params
-  def parse_cmd(cmd_str) do
-    with {:ok, result, _, _, _, _} <- cmd(cmd_str) do
-      {[first_arg], others} = Enum.split(result, 1)
-      do_parse_cmd(first_arg, others)
-    end
-  end
-
-  def do_parse_cmd("aptos", params), do: handle_aptos(params)
-  def do_parse_cmd("aptos move", params), do: handle_aptos_move(params)
-
-  def handle_aptos(params) do
-    :aptos
-  end
-
-  def handle_aptos_move(params) do
-    :aptos_move
   end
   
 end
