@@ -6,7 +6,7 @@ defmodule AptosE2ETestTool.MixProject do
       app: :aptos_e2e_test_tool,
       version: "0.1.0",
       elixir: "~> 1.14",
-      escript: [main_module: AptosE2ETestTool.CliParser],
+      escript: [main_module: AptosE2ETestTool],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       releases: [

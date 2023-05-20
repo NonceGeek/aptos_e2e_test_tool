@@ -15,11 +15,13 @@ aptos account get-balance --profile leeduckgo
 # run the set message
 aptos move run --function-id 0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::set_message --profile leeduckgo --args string:Hello_World 
 aptos account list --query resources --profile leeduckgo
+# ex-script: sleep 2s
 # ↓ this cmd should return true ↓
 # default profile
 # ex-script: assert "message" of leeduckgo in "0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::MessageHolder" == "Hello_World"
 
 aptos move run --function-id 0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::set_message  --profile leeduckgo --args string:Hello_Aptos 
+# ex-script: sleep 2s
 # ↓ this cmd should return false ↓
 # default profile
 # ex-script: assert "message" of leeduckgo in "0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::MessageHolder" == "Hello_World"

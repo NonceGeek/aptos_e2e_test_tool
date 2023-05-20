@@ -81,8 +81,9 @@ defmodule AptosE2ETestTool.CliParser do
     info = get_info()
     %{acct: acct} = Map.get(info, String.to_atom(profile_name))
     %{client: client} = info
+    {:ok, acct_preloaded} =Aptos.load_account(client, acct)
 
-    Aptos.submit_txn(client, acct, payload)
+    Aptos.submit_txn(client, acct_preloaded, payload)
   end
   
   # --- end ---
