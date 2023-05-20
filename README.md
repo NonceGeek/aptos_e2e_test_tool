@@ -5,14 +5,33 @@ Aptos E2E Test Tool based on [Web3AptosEx](https://github.com/NonceGeek/web3_apt
 It can test aptos smart contract with script like this:
 
 ```
+# -[acct operations]-
+
 # ex-script: set-network testnet
 # init account.
-aptos init --profile leeduckgo
+aptos init --priv 0xb46737230c6037ac1c5efcf67c1ba039947eaf354d3960851df55ed3abd2eb9c --profile leeduckgo
 # get some faucet.
 aptos account fund-with-faucet --profile leeduckgo
 aptos account get-balance --profile leeduckgo
-# ex-script: assert "aptos account get-balance --profile leeduckgo" ==  %{coin: %{value: "100000000"}}
-......
+
+# -[contract test]-
+# contract addr: 0xcd6e69ff3c22db037584f b1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd
+# network: testnet
+# contract name: hello_blockchain
+
+# run the set message
+aptos move run --function-id 0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::set_message --profile leeduckgo --args string:Hello_World
+aptos account list --query resources --profile leeduckgo
+# ex-script: sleep 2s
+# ↓ this cmd should return true ↓
+# default profile
+# ex-script: assert "message" of leeduckgo in "0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::MessageHolder" == "Hello_World"
+
+aptos move run --function-id 0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::set_message  --profile leeduckgo --args string:Hello_Aptos
+# ex-script: sleep 2s
+# ↓ this cmd should return false ↓
+# default profile
+# ex-script: assert "message" of leeduckgo in "0xcd6e69ff3c22db037584fb1650f7ca75df721fb0143690fb33f2f3bd0c1fe5bd::message::MessageHolder" == "Hello_World"
 ```
 
 the script is combined with aptos cli command, annotate & ex-script like `assert`,  so this tool is very friendly for Aptos developers to writing `e2e test script`! 
