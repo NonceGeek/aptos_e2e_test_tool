@@ -9,6 +9,7 @@ defmodule AptosE2eTestTool.MixProject do
       escript: [main_module: AptosE2ETestTool],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      aliases: aliases(),
       releases: [
         aptos_e2e_test_tool: [
           steps: [:assemble] ++ ex_unit_release()
