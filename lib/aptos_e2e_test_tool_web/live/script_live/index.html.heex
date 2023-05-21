@@ -1,0 +1,8 @@
+<.form for={@form} phx-submit="on_submit">
+  <.field field={@form[:name]} />
+  <.field field={@form[:content]} type="textarea" rows="20" cols="100"/>
+
+  <.button type="submit" label="Submit" />
+</.form>
+<p> <%= raw @log %> </p>
+

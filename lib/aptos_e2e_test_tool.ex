@@ -27,4 +27,13 @@ defmodule AptosE2ETestTool do
       Logger.info("#{inspect(cmd)} => #{inspect(res)}")
     end)
   end
+  def web_run(content) do
+    cmds =
+      ScriptParser.parse_script_to_clis(content)
+    Enum.map(cmds, fn cmd ->
+      # handle cmd one by one.
+      res = CliParser.exec_cmd(cmd)
+      "#{inspect(cmd)} => #{inspect(res)}"
+    end) |> Enum.reduce("", fn x,acc -> "#{acc}<br/>#{x}" end)
+  end
 end
