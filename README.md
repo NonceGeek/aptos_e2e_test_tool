@@ -58,3 +58,23 @@ Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_do
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at <https://hexdocs.pm/aptos_e2e_test_tool>.
 
+## Distributed Rule
+
+<!-- distributed_rules -->
+
+Linked Repos:
+
+```
+https://github.com/NonceGeek/web3_aptos_ex, 20%
+self, 80%
+```
+
+Contributors:
+
+```
+pool, 20%
+https://github.com/leeduckgo, 40%
+https://github.com/yangcancai, 40%
+```
+
+<!-- / distributed_rules -->
