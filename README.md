@@ -73,8 +73,8 @@ Contributors:
 
 ```
 pool, 20%
-https://github.com/leeduckgo, 40%
-https://github.com/yangcancai, 40%
+https://github.com/leeduckgo, 30%
+https://github.com/yangcancai, 30%
 ```
 
 <!-- / distributed_rules -->
